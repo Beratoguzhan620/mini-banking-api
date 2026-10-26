@@ -1,0 +1,64 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build:
+    name: Build and test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restore
+        run: dotnet restore MiniBanking.slnx
+
+      - name: Build
+        run: dotnet build MiniBanking.slnx --no-restore --configuration Release
+
+      - name: Unit tests
+        run: dotnet test tests/MiniBanking.UnitTests/MiniBanking.UnitTests.csproj --no-build --configuration Release --logger "console;verbosity=normal"
+
+      - name: Integration tests (PostgreSQL in Testcontainers)
+        run: dotnet test tests/MiniBanking.IntegrationTests/MiniBanking.IntegrationTests.csproj --no-build --configuration Release --logger "console;verbosity=normal"
+
+      - name: Check for model changes without a migration
+        run: |
+          dotnet tool install --global dotnet-ef --version 10.0.14
+          dotnet ef migrations has-pending-model-changes --project src/MiniBanking.Infrastructure --startup-project src/MiniBanking.Api --no-build --configuration Release
+
+  docker:
+    name: Docker Compose smoke test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start the stack
+        run: docker compose up --build --detach --wait --wait-timeout 300
+
+      - name: Check the API
+        run: |
+          for i in $(seq 1 60); do
+            if curl -sf http://localhost:8080/health/ready > /dev/null; then break; fi
+            sleep 2
+          done
+          curl -sf http://localhost:8080/health/ready | grep -q "Healthy"
+          curl -sf http://localhost:8080/openapi/v1.json | grep -q '"openapi"'
+          echo "Mini Banking API is up."
+
+      - name: Show logs
+        if: failure()
+        run: docker compose logs --no-color
+
+      - name: Stop the stack
+        if: always()
+        run: docker compose down --volumes

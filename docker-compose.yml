@@ -1,0 +1,36 @@
+# One command: docker compose up --build
+# API reference: http://localhost:8080/scalar
+# Override the local defaults with a .env file (see .env.example).
+name: mini-banking
+
+services:
+  db:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_DB: mini_banking
+      POSTGRES_USER: banking
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-banking-local}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U banking -d mini_banking"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    build: .
+    restart: on-failure
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__Banking: "Host=db;Database=mini_banking;Username=banking;Password=${POSTGRES_PASSWORD:-banking-local}"
+      Database__MigrateOnStartup: "true"
+      TZ: Europe/Istanbul
+    ports:
+      - "8080:8080"
+
+volumes:
+  db-data:
