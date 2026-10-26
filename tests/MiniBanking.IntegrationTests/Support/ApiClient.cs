@@ -65,6 +65,9 @@ public static class ApiClient
     public static Task<HttpResponseMessage> WithdrawAsync(this HttpClient client, Guid accountId, decimal amount) =>
         client.PostAsJsonAsync($"/api/accounts/{accountId}/withdrawals", new { amount });
 
+    public static Task<HttpResponseMessage> TransferAsync(this HttpClient client, Guid sourceAccountId, string destinationAccountNumber, decimal amount, string? description = null) =>
+        client.PostAsJsonAsync("/api/transfers", new { sourceAccountId, destinationAccountNumber, amount, description });
+
     public static async Task<AccountDto> GetAccountAsync(this HttpClient client, Guid accountId) =>
         await (await client.GetAsync($"/api/accounts/{accountId}")).ReadAsync<AccountDto>();
 
