@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
+using Microsoft.EntityFrameworkCore;
 using MiniBanking.Domain;
 
 namespace MiniBanking.Api.Common;
@@ -13,12 +14,19 @@ internal sealed class DomainExceptionHandler(IProblemDetailsService problemDetai
 {
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext, Exception exception, CancellationToken cancellationToken)
     {
-        if (exception is not DomainException domain)
+        var (code, detail) = exception switch
+        {
+            DomainException domain => (domain.Code, domain.Message),
+            DbUpdateConcurrencyException => (ErrorCodes.ConcurrentUpdate, "The resource was changed by another request. Read it again and retry."),
+            _ => (null, null),
+        };
+
+        if (code is null)
         {
             return false;
         }
 
-        var status = ErrorCodes.StatusFor(domain.Code);
+        var status = ErrorStatuses.StatusFor(code);
         httpContext.Response.StatusCode = status;
 
         return await problemDetails.TryWriteAsync(new ProblemDetailsContext
@@ -29,8 +37,8 @@ internal sealed class DomainExceptionHandler(IProblemDetailsService problemDetai
             {
                 Status = status,
                 Title = ReasonPhrases.GetReasonPhrase(status),
-                Detail = domain.Message,
-                Extensions = { ["code"] = domain.Code },
+                Detail = detail,
+                Extensions = { ["code"] = code },
             },
         });
     }

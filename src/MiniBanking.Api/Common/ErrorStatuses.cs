@@ -1,13 +1,17 @@
+using MiniBanking.Domain;
+
 namespace MiniBanking.Api.Common;
 
 /// <summary>Maps domain error codes to HTTP status codes. Unknown codes are business rule failures (422).</summary>
-internal static class ErrorCodes
+internal static class ErrorStatuses
 {
     private static readonly Dictionary<string, int> Statuses = new(StringComparer.Ordinal)
     {
-        ["validation_failed"] = StatusCodes.Status400BadRequest,
-        ["not_found"] = StatusCodes.Status404NotFound,
-        ["conflict"] = StatusCodes.Status409Conflict,
+        [ErrorCodes.ValidationFailed] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.InvalidCredentials] = StatusCodes.Status401Unauthorized,
+        [ErrorCodes.NotFound] = StatusCodes.Status404NotFound,
+        [ErrorCodes.EmailTaken] = StatusCodes.Status409Conflict,
+        [ErrorCodes.ConcurrentUpdate] = StatusCodes.Status409Conflict,
     };
 
     public static int StatusFor(string code) =>
