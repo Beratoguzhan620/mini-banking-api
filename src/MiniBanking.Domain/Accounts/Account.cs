@@ -42,6 +42,57 @@ public sealed class Account
         OpenedAt = now,
     };
 
+    /// <summary>The bank's side of deposits and withdrawals for one currency. Seeded by a migration.</summary>
+    public static Account OpenSystem(string currency, DateTimeOffset openedAt) => new()
+    {
+        Id = SystemAccounts.IdFor(currency),
+        Number = SystemAccounts.NumberFor(currency),
+        Currency = currency,
+        Kind = AccountKind.System,
+        Status = AccountStatus.Active,
+        OpenedAt = openedAt,
+    };
+
+    /// <summary>Checks that <paramref name="amountMinor"/> may leave this account.</summary>
+    public void EnsureCanSend(long amountMinor)
+    {
+        EnsureNotClosed();
+        if (Kind == AccountKind.System)
+        {
+            return;
+        }
+
+        if (Status == AccountStatus.Frozen)
+        {
+            throw new DomainException(ErrorCodes.AccountFrozen, "The account is frozen; money cannot leave it.");
+        }
+
+        if (BalanceMinor < amountMinor)
+        {
+            throw new DomainException(ErrorCodes.InsufficientFunds, "The account balance is too low for this amount.");
+        }
+    }
+
+    /// <summary>Frozen accounts can still receive money; closed ones cannot.</summary>
+    public void EnsureCanReceive() => EnsureNotClosed();
+
+    internal void Debit(long amountMinor)
+    {
+        // System accounts are derived from the ledger only, so they never become a hot row under load.
+        if (Kind == AccountKind.Customer)
+        {
+            BalanceMinor -= amountMinor;
+        }
+    }
+
+    internal void Credit(long amountMinor)
+    {
+        if (Kind == AccountKind.Customer)
+        {
+            BalanceMinor += amountMinor;
+        }
+    }
+
     public void Freeze()
     {
         EnsureNotClosed();

@@ -2,6 +2,7 @@ using Microsoft.AspNetCore.Diagnostics;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
+using MiniBanking.Api.Features.Transactions;
 using MiniBanking.Domain;
 
 namespace MiniBanking.Api.Common;
@@ -29,17 +30,25 @@ internal sealed class DomainExceptionHandler(IProblemDetailsService problemDetai
         var status = ErrorStatuses.StatusFor(code);
         httpContext.Response.StatusCode = status;
 
+        var problem = new ProblemDetails
+        {
+            Status = status,
+            Title = ReasonPhrases.GetReasonPhrase(status),
+            Detail = detail,
+            Extensions = { ["code"] = code },
+        };
+
+        if (exception is TransactionFailedException failed)
+        {
+            // The attempt is stored; the id lets the client and support find it.
+            problem.Extensions["transactionId"] = failed.TransactionId;
+        }
+
         return await problemDetails.TryWriteAsync(new ProblemDetailsContext
         {
             HttpContext = httpContext,
             Exception = exception,
-            ProblemDetails = new ProblemDetails
-            {
-                Status = status,
-                Title = ReasonPhrases.GetReasonPhrase(status),
-                Detail = detail,
-                Extensions = { ["code"] = code },
-            },
+            ProblemDetails = problem,
         });
     }
 }

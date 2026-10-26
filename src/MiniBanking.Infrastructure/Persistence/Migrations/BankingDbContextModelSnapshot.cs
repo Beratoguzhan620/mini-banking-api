@@ -91,6 +91,38 @@ namespace MiniBanking.Infrastructure.Persistence.Migrations
 
                             t.HasCheckConstraint("ck_accounts_customer_has_owner", "kind = 'System' OR customer_id IS NOT NULL");
                         });
+
+                    b.HasData(
+                        new
+                        {
+                            Id = new Guid("00000000-0000-7000-8000-000000000001"),
+                            BalanceMinor = 0L,
+                            Currency = "TRY",
+                            Kind = "System",
+                            Number = "SYS-TRY",
+                            OpenedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Status = "Active"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-7000-8000-000000000002"),
+                            BalanceMinor = 0L,
+                            Currency = "USD",
+                            Kind = "System",
+                            Number = "SYS-USD",
+                            OpenedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Status = "Active"
+                        },
+                        new
+                        {
+                            Id = new Guid("00000000-0000-7000-8000-000000000003"),
+                            BalanceMinor = 0L,
+                            Currency = "EUR",
+                            Kind = "System",
+                            Number = "SYS-EUR",
+                            OpenedAt = new DateTimeOffset(new DateTime(2026, 1, 1, 0, 0, 0, 0, DateTimeKind.Unspecified), new TimeSpan(0, 0, 0, 0, 0)),
+                            Status = "Active"
+                        });
                 });
 
             modelBuilder.Entity("MiniBanking.Domain.Customers.Customer", b =>
@@ -131,6 +163,129 @@ namespace MiniBanking.Infrastructure.Persistence.Migrations
                     b.ToTable("customers", (string)null);
                 });
 
+            modelBuilder.Entity("MiniBanking.Domain.Transactions.BankTransaction", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .HasColumnType("uuid")
+                        .HasColumnName("id");
+
+                    b.Property<long>("AmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_minor");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<string>("Currency")
+                        .IsRequired()
+                        .HasMaxLength(3)
+                        .HasColumnType("character(3)")
+                        .HasColumnName("currency")
+                        .IsFixedLength();
+
+                    b.Property<string>("Description")
+                        .HasMaxLength(140)
+                        .HasColumnType("character varying(140)")
+                        .HasColumnName("description");
+
+                    b.Property<Guid?>("DestinationAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("destination_account_id");
+
+                    b.Property<string>("FailureCode")
+                        .HasMaxLength(64)
+                        .HasColumnType("character varying(64)")
+                        .HasColumnName("failure_code");
+
+                    b.Property<string>("FailureReason")
+                        .HasMaxLength(300)
+                        .HasColumnType("character varying(300)")
+                        .HasColumnName("failure_reason");
+
+                    b.Property<Guid>("InitiatedBy")
+                        .HasColumnType("uuid")
+                        .HasColumnName("initiated_by");
+
+                    b.Property<Guid?>("SourceAccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("source_account_id");
+
+                    b.Property<string>("Status")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("status");
+
+                    b.Property<string>("Type")
+                        .IsRequired()
+                        .HasMaxLength(16)
+                        .HasColumnType("character varying(16)")
+                        .HasColumnName("type");
+
+                    b.HasKey("Id")
+                        .HasName("pk_bank_transactions");
+
+                    b.HasIndex("DestinationAccountId")
+                        .HasDatabaseName("ix_bank_transactions_destination_account_id");
+
+                    b.HasIndex("InitiatedBy")
+                        .HasDatabaseName("ix_bank_transactions_initiated_by");
+
+                    b.HasIndex("SourceAccountId")
+                        .HasDatabaseName("ix_bank_transactions_source_account_id");
+
+                    b.ToTable("bank_transactions", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_bank_transactions_amount_positive", "amount_minor > 0");
+                        });
+                });
+
+            modelBuilder.Entity("MiniBanking.Domain.Transactions.LedgerEntry", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityAlwaysColumn(b.Property<long>("Id"));
+
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("account_id");
+
+                    b.Property<long>("AmountMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("amount_minor");
+
+                    b.Property<long?>("BalanceAfterMinor")
+                        .HasColumnType("bigint")
+                        .HasColumnName("balance_after_minor");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("created_at");
+
+                    b.Property<Guid>("TransactionId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("transaction_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_ledger_entries");
+
+                    b.HasIndex("TransactionId")
+                        .HasDatabaseName("ix_ledger_entries_transaction_id");
+
+                    b.HasIndex("AccountId", "Id")
+                        .IsDescending(false, true)
+                        .HasDatabaseName("ix_ledger_entries_account_id_id");
+
+                    b.ToTable("ledger_entries", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_ledger_entries_amount_not_zero", "amount_minor <> 0");
+                        });
+                });
+
             modelBuilder.Entity("MiniBanking.Domain.Accounts.Account", b =>
                 {
                     b.HasOne("MiniBanking.Domain.Customers.Customer", null)
@@ -138,6 +293,45 @@ namespace MiniBanking.Infrastructure.Persistence.Migrations
                         .HasForeignKey("CustomerId")
                         .OnDelete(DeleteBehavior.Restrict)
                         .HasConstraintName("fk_accounts_customers_customer_id");
+                });
+
+            modelBuilder.Entity("MiniBanking.Domain.Transactions.BankTransaction", b =>
+                {
+                    b.HasOne("MiniBanking.Domain.Accounts.Account", null)
+                        .WithMany()
+                        .HasForeignKey("DestinationAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_bank_transactions_accounts_destination_account_id");
+
+                    b.HasOne("MiniBanking.Domain.Customers.Customer", null)
+                        .WithMany()
+                        .HasForeignKey("InitiatedBy")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_bank_transactions_customers_initiated_by");
+
+                    b.HasOne("MiniBanking.Domain.Accounts.Account", null)
+                        .WithMany()
+                        .HasForeignKey("SourceAccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_bank_transactions_accounts_source_account_id");
+                });
+
+            modelBuilder.Entity("MiniBanking.Domain.Transactions.LedgerEntry", b =>
+                {
+                    b.HasOne("MiniBanking.Domain.Accounts.Account", null)
+                        .WithMany()
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ledger_entries_accounts_account_id");
+
+                    b.HasOne("MiniBanking.Domain.Transactions.BankTransaction", null)
+                        .WithMany()
+                        .HasForeignKey("TransactionId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_ledger_entries_bank_transactions_transaction_id");
                 });
 #pragma warning restore 612, 618
         }

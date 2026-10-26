@@ -31,5 +31,20 @@ internal sealed class AccountConfiguration : IEntityTypeConfiguration<Account>
             .WithMany()
             .HasForeignKey(a => a.CustomerId)
             .OnDelete(DeleteBehavior.Restrict);
+
+        // One system account per currency; fixed ids and a fixed opening date keep the seed stable across migrations.
+        var seededAt = new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero);
+        builder.HasData(SystemAccounts.All.Keys.Select(currency => new
+        {
+            Id = SystemAccounts.IdFor(currency),
+            CustomerId = (Guid?)null,
+            Number = SystemAccounts.NumberFor(currency),
+            Currency = currency,
+            Kind = AccountKind.System,
+            BalanceMinor = 0L,
+            Status = AccountStatus.Active,
+            OpenedAt = seededAt,
+            ClosedAt = (DateTimeOffset?)null,
+        }));
     }
 }
