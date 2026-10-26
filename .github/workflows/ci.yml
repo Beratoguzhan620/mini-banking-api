@@ -53,7 +53,17 @@ jobs:
           done
           curl -sf http://localhost:8080/health/ready | grep -q "Healthy"
           curl -sf http://localhost:8080/openapi/v1.json | grep -q '"openapi"'
-          echo "Mini Banking API is up."
+
+          api=http://localhost:8080/api
+          json='Content-Type: application/json'
+          curl -sf -X POST $api/auth/register -H "$json" -d '{"email":"smoke@example.com","fullName":"Smoke Test","password":"smoke-test-password"}' > /dev/null
+          token=$(curl -sf -X POST $api/auth/login -H "$json" -d '{"email":"smoke@example.com","password":"smoke-test-password"}' | jq -r .accessToken)
+          auth="Authorization: Bearer $token"
+          account=$(curl -sf -X POST $api/accounts -H "$json" -H "$auth" -d '{"currency":"TRY"}' | jq -r .id)
+          curl -sf -X POST $api/accounts/$account/deposits -H "$json" -H "$auth" -d '{"amount":250.50}' > /dev/null
+          balance=$(curl -sf $api/accounts/$account -H "$auth" | jq -r .balance)
+          test "$balance" = "250.5"
+          echo "Mini Banking API is up and moves money."
 
       - name: Show logs
         if: failure()
