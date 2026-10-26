@@ -11,6 +11,14 @@ public sealed record TokenDto(string AccessToken, string TokenType, DateTimeOffs
 
 public sealed record CustomerDto(Guid Id, string Email, string FullName, DateTimeOffset CreatedAt);
 
+public sealed record TransactionDto(
+    Guid Id, string Type, string Status, string Currency, decimal Amount,
+    string? SourceAccountNumber, string? DestinationAccountNumber, string? Description, string? FailureCode, DateTimeOffset CreatedAt);
+
+public sealed record HistoryItemDto(Guid TransactionId, string Type, decimal Amount, decimal BalanceAfter, string? CounterpartyAccountNumber, string? Description, DateTimeOffset CreatedAt);
+
+public sealed record HistoryPageDto(List<HistoryItemDto> Items, string? NextCursor);
+
 /// <summary>Thin helpers over HttpClient so tests read like the API flow they exercise.</summary>
 public static class ApiClient
 {
@@ -49,6 +57,23 @@ public static class ApiClient
         var response = await client.PostAsJsonAsync("/api/accounts", new { currency });
         response.EnsureSuccessStatusCode();
         return (await response.Content.ReadFromJsonAsync<AccountDto>(Json))!;
+    }
+
+    public static Task<HttpResponseMessage> DepositAsync(this HttpClient client, Guid accountId, decimal amount, string? description = null) =>
+        client.PostAsJsonAsync($"/api/accounts/{accountId}/deposits", new { amount, description });
+
+    public static Task<HttpResponseMessage> WithdrawAsync(this HttpClient client, Guid accountId, decimal amount) =>
+        client.PostAsJsonAsync($"/api/accounts/{accountId}/withdrawals", new { amount });
+
+    public static async Task<AccountDto> GetAccountAsync(this HttpClient client, Guid accountId) =>
+        await (await client.GetAsync($"/api/accounts/{accountId}")).ReadAsync<AccountDto>();
+
+    /// <summary>Opens an account and deposits <paramref name="balance"/> into it.</summary>
+    public static async Task<AccountDto> FundedAccountAsync(this HttpClient client, decimal balance, string currency = "TRY")
+    {
+        var account = await client.OpenAccountAsync(currency);
+        (await client.DepositAsync(account.Id, balance)).EnsureSuccessStatusCode();
+        return await client.GetAccountAsync(account.Id);
     }
 
     public static async Task<T> ReadAsync<T>(this HttpResponseMessage response) =>
