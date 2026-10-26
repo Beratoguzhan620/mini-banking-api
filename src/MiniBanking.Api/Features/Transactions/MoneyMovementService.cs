@@ -13,6 +13,8 @@ namespace MiniBanking.Api.Features.Transactions;
 /// </summary>
 internal sealed class MoneyMovementService(BankingDbContext db, TimeProvider clock, ILogger<MoneyMovementService> logger)
 {
+    private const string PostingSavepoint = "posting";
+
     private sealed record Posting(BankTransaction Transaction, Account From, Account To);
 
     public Task<BankTransaction> DepositAsync(Guid customerId, Guid accountId, long amountMinor, string? description, CancellationToken ct) =>
@@ -68,31 +70,32 @@ internal sealed class MoneyMovementService(BankingDbContext db, TimeProvider clo
 
     private async Task<BankTransaction> PostAsync(Func<Task<Posting>> prepare, CancellationToken ct)
     {
-        BankTransaction transaction;
+        await using var dbTransaction = await db.Database.BeginTransactionAsync(ct);
+
+        // Lookups, locks and ownership checks happen here; a missing account is a plain 404, not a failed transaction.
+        var posting = await prepare();
+        var transaction = posting.Transaction;
+        await dbTransaction.CreateSavepointAsync(PostingSavepoint, ct);
+
         Exception failure;
-
-        await using (var dbTransaction = await db.Database.BeginTransactionAsync(ct))
+        try
         {
-            // Lookups and ownership checks happen here; a missing account is a plain 404, not a failed transaction.
-            var posting = await prepare();
-            transaction = posting.Transaction;
-
-            try
-            {
-                var entries = Ledger.Move(transaction, posting.From, posting.To);
-                db.BankTransactions.Add(transaction);
-                db.LedgerEntries.AddRange(entries);
-                await db.SaveChangesAsync(ct);
-                await dbTransaction.CommitAsync(ct);
-                return transaction;
-            }
-            catch (Exception ex) when (ex is not OperationCanceledException)
-            {
-                failure = ex;
-            }
+            var entries = Ledger.Move(transaction, posting.From, posting.To);
+            db.BankTransactions.Add(transaction);
+            db.LedgerEntries.AddRange(entries);
+            await db.SaveChangesAsync(ct);
+            await dbTransaction.CommitAsync(ct);
+            return transaction;
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException)
+        {
+            failure = ex;
         }
 
-        // The database transaction is rolled back at this point; forget the in-memory balance changes too.
+        // Undo the posting but keep the account locks: the failed record below references both accounts,
+        // and its foreign key checks must not queue behind other transfers. Writing it after a full rollback
+        // took those row locks in constraint order instead of id order and deadlocked under load.
+        await dbTransaction.RollbackToSavepointAsync(PostingSavepoint, ct);
         db.ChangeTracker.Clear();
 
         var reason = failure as DomainException
@@ -100,6 +103,7 @@ internal sealed class MoneyMovementService(BankingDbContext db, TimeProvider clo
         transaction.Fail(reason.Code, reason.Message);
         db.BankTransactions.Add(transaction);
         await db.SaveChangesAsync(ct);
+        await dbTransaction.CommitAsync(ct);
 
         if (failure is not DomainException)
         {
