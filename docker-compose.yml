@@ -28,6 +28,8 @@ services:
       ASPNETCORE_ENVIRONMENT: Production
       ConnectionStrings__Banking: "Host=db;Database=mini_banking;Username=banking;Password=${POSTGRES_PASSWORD:-banking-local}"
       Database__MigrateOnStartup: "true"
+      Jwt__SigningKey: ${JWT_SIGNING_KEY:-}
+      Jwt__AllowEphemeralKey: "true"
       TZ: Europe/Istanbul
     ports:
       - "8080:8080"
