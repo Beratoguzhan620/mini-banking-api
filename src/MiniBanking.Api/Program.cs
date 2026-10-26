@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using MiniBanking.Api.Common;
 using MiniBanking.Api.Features.Accounts;
 using MiniBanking.Api.Features.Auth;
+using MiniBanking.Api.Features.Transactions;
 using MiniBanking.Infrastructure;
 using MiniBanking.Infrastructure.Persistence;
 using Scalar.AspNetCore;
@@ -36,6 +37,7 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 });
 
 builder.Services.AddBankingAuth(builder.Configuration);
+builder.Services.AddScoped<MoneyMovementService>();
 
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
     context.ProblemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier);
@@ -60,6 +62,7 @@ app.MapGet("/", () => Results.Redirect("/scalar")).ExcludeFromDescription();
 
 app.MapAuthEndpoints();
 app.MapAccountEndpoints();
+app.MapTransactionEndpoints();
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });

@@ -12,6 +12,7 @@ internal static class ErrorStatuses
         [ErrorCodes.NotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.EmailTaken] = StatusCodes.Status409Conflict,
         [ErrorCodes.ConcurrentUpdate] = StatusCodes.Status409Conflict,
+        [ErrorCodes.ProcessingError] = StatusCodes.Status500InternalServerError,
     };
 
     public static int StatusFor(string code) =>
