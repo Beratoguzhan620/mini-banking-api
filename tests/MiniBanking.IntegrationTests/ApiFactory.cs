@@ -12,6 +12,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 {
     private readonly PostgreSqlContainer _database = new PostgreSqlBuilder("postgres:17-alpine").Build();
 
+    private static readonly string SigningKey = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(48));
+
     public string ConnectionString => _database.GetConnectionString();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -19,6 +21,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseEnvironment("Testing");
         builder.UseSetting("ConnectionStrings:Banking", ConnectionString);
         builder.UseSetting("Database:MigrateOnStartup", "true");
+        builder.UseSetting("Jwt:SigningKey", SigningKey);
     }
 
     public async Task InitializeAsync()
