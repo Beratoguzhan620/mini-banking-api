@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using MiniBanking.Infrastructure.Persistence;
 
@@ -10,7 +11,10 @@ public static class DependencyInjection
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
 
-        services.AddDbContext<BankingDbContext>(options => ConfigureDbContext(options, connectionString));
+        // Interceptors registered in DI are picked up, so cross-cutting concerns (and fault injection in
+        // tests) can be added without touching this method.
+        services.AddDbContext<BankingDbContext>((provider, options) => ConfigureDbContext(options, connectionString)
+            .AddInterceptors(provider.GetServices<IInterceptor>()));
 
         return services;
     }

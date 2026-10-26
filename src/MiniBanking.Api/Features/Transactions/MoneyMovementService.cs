@@ -33,6 +33,39 @@ internal sealed class MoneyMovementService(BankingDbContext db, TimeProvider clo
             return new Posting(transaction, account, system);
         }, ct);
 
+    /// <summary>
+    /// Both accounts are locked in id order. Two transfers running in opposite directions (A→B and B→A)
+    /// therefore always request the locks in the same order and cannot deadlock.
+    /// </summary>
+    public Task<BankTransaction> TransferAsync(
+        Guid customerId, Guid sourceAccountId, string destinationNumber, long amountMinor, string? description, CancellationToken ct) =>
+        PostAsync(async () =>
+        {
+            var destinationId = await db.Accounts.AsNoTracking()
+                .Where(a => a.Number == destinationNumber && a.Kind == AccountKind.Customer)
+                .Select(a => (Guid?)a.Id)
+                .SingleOrDefaultAsync(ct)
+                ?? throw new DomainException(ErrorCodes.DestinationNotFound, "No account exists with this number.");
+
+            var locked = new Dictionary<Guid, Account>();
+            foreach (var id in new[] { sourceAccountId, destinationId }.Distinct().Order())
+            {
+                foreach (var account in await LockAsync(id, ct))
+                {
+                    locked[account.Id] = account;
+                }
+            }
+
+            if (!locked.TryGetValue(sourceAccountId, out var source) || source.CustomerId != customerId || source.Kind != AccountKind.Customer)
+            {
+                throw new DomainException(ErrorCodes.NotFound, "Account not found.");
+            }
+
+            var destination = locked[destinationId];
+            var transaction = BankTransaction.Transfer(customerId, source, destination, amountMinor, description, clock.GetUtcNow());
+            return new Posting(transaction, source, destination);
+        }, ct);
+
     private async Task<BankTransaction> PostAsync(Func<Task<Posting>> prepare, CancellationToken ct)
     {
         BankTransaction transaction;
