@@ -63,6 +63,11 @@ jobs:
           curl -sf -X POST $api/accounts/$account/deposits -H "$json" -H "$auth" -d '{"amount":250.50}' > /dev/null
           balance=$(curl -sf $api/accounts/$account -H "$auth" | jq -r .balance)
           test "$balance" = "250.5"
+
+          second=$(curl -sf -X POST $api/accounts -H "$json" -H "$auth" -d '{"currency":"TRY"}' | jq -r .number)
+          curl -sf -X POST $api/transfers -H "$json" -H "$auth" -d "{\"sourceAccountId\":\"$account\",\"destinationAccountNumber\":\"$second\",\"amount\":50}" > /dev/null
+          balance=$(curl -sf $api/accounts/$account -H "$auth" | jq -r .balance)
+          test "$balance" = "200.5"
           echo "Mini Banking API is up and moves money."
 
       - name: Show logs

@@ -7,6 +7,7 @@ using MiniBanking.Api.Common;
 using MiniBanking.Api.Features.Accounts;
 using MiniBanking.Api.Features.Auth;
 using MiniBanking.Api.Features.Transactions;
+using MiniBanking.Api.Features.Transfers;
 using MiniBanking.Infrastructure;
 using MiniBanking.Infrastructure.Persistence;
 using Scalar.AspNetCore;
@@ -63,6 +64,7 @@ app.MapGet("/", () => Results.Redirect("/scalar")).ExcludeFromDescription();
 app.MapAuthEndpoints();
 app.MapAccountEndpoints();
 app.MapTransactionEndpoints();
+app.MapTransferEndpoints();
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });
