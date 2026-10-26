@@ -1,0 +1,23 @@
+# Build
+bin/
+obj/
+[Dd]ebug/
+[Rr]elease/
+TestResults/
+*.user
+*.suo
+.vs/
+.vscode/
+.idea/
+*.log
+
+# Secrets and local settings
+.env
+.env.*
+!.env.example
+secrets.json
+*.pfx
+
+# OS
+.DS_Store
+Thumbs.db
