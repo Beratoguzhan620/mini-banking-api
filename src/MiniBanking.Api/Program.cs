@@ -75,7 +75,13 @@ app.UseStatusCodePages();
 app.UseAuthorization();
 
 app.MapOpenApi();
-app.MapScalarApiReference(options => options.WithTitle("Mini Banking API"));
+app.MapScalarApiReference(options => options
+    .WithTitle("Mini Banking API")
+    .WithTheme(ScalarTheme.Default)
+    .ForceLightMode()
+    .HideDarkModeToggle()
+    .DisableDefaultFonts()
+    .WithCustomCss(ScalarStyle.Css));
 app.MapGet("/", () => Results.Redirect("/scalar")).ExcludeFromDescription();
 
 app.MapAuthEndpoints();
