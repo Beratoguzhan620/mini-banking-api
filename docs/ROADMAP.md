@@ -58,6 +58,8 @@ tests/MiniBanking.IntegrationTests  Real PostgreSQL via Testcontainers, HTTP-lev
 
 ## Stages
 
+All seven stages are done.
+
 | # | Branch | Content |
 |---|---|---|
 | 01 | `stage/01-skeleton` | Solution layout, warnings as errors, central package versions, Docker Compose, health checks, Scalar, ProblemDetails, CI (build, tests, compose smoke test, pending migration check) |
@@ -69,6 +71,8 @@ tests/MiniBanking.IntegrationTests  Real PostgreSQL via Testcontainers, HTTP-lev
 | 07 | `stage/07-docs` | README (EN + TR), architecture diagram, design decisions, Scalar and terminal GIFs |
 
 ## Later
+
+See also "Roadmap and known gaps" in the README.
 
 - Daily withdrawal limits.
 - Outbox for transaction events (Notification Service integration).

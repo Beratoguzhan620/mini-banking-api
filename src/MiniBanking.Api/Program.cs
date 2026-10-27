@@ -43,6 +43,8 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     // Keep Turkish characters readable in responses instead of \u escapes.
     options.SerializerOptions.Encoder = JavaScriptEncoder.Create(UnicodeRanges.All);
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    // Amounts are JSON numbers; "10" as a string is refused rather than guessed.
+    options.SerializerOptions.NumberHandling = JsonNumberHandling.Strict;
 });
 
 builder.Services.AddBankingAuth(builder.Configuration);
@@ -56,7 +58,9 @@ builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = 
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 
 builder.Services.AddOpenApi(options => options
-    .AddDocumentTransformer<BearerSecuritySchemeTransformer>()
+    .AddDocumentTransformer<DocumentInfoTransformer>()
+    .AddDocumentTransformer<SecuritySchemesTransformer>()
+    .AddOperationTransformer<SecuritySchemesTransformer>()
     .AddOperationTransformer<IdempotencyHeaderTransformer>());
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<BankingDbContext>("database", tags: ["ready"]);
@@ -75,7 +79,18 @@ app.UseStatusCodePages();
 app.UseAuthorization();
 
 app.MapOpenApi();
-app.MapScalarApiReference(options => options.WithTitle("Mini Banking API"));
+app.MapScalarApiReference(options => options
+    .WithTitle("Mini Banking API")
+    .WithTheme(ScalarTheme.Default)
+    .ForceLightMode()
+    .HideDarkModeToggle()
+    .DisableDefaultFonts()
+    .WithCustomCss(ScalarStyle.Css)
+    .HideDeveloperTools()
+    .HideClientButton()
+    .DisableAgent()
+    .DisableMcp()
+    .DisableTelemetry());
 app.MapGet("/", () => Results.Redirect("/scalar")).ExcludeFromDescription();
 
 app.MapAuthEndpoints();

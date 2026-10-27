@@ -12,9 +12,9 @@ using MiniBanking.Infrastructure.Persistence;
 
 namespace MiniBanking.Api.Features.Auth;
 
-internal sealed record RegisterRequest(string? Email, string? FullName, string? Password);
+internal sealed record RegisterRequest(string Email, string FullName, string Password);
 
-internal sealed record LoginRequest(string? Email, string? Password);
+internal sealed record LoginRequest(string Email, string Password);
 
 internal sealed record CustomerResponse(Guid Id, string Email, string FullName, DateTimeOffset CreatedAt)
 {
@@ -51,14 +51,14 @@ internal static class AuthEndpoints
             return validation.ToProblem();
         }
 
-        var email = Customer.NormalizeEmail(request.Email!);
+        var email = Customer.NormalizeEmail(request.Email);
         if (await db.Customers.AnyAsync(c => c.Email == email, ct))
         {
             throw EmailTaken();
         }
 
-        var customer = Customer.Register(email, request.FullName!, clock.GetUtcNow());
-        customer.SetPasswordHash(passwords.Hash(customer, request.Password!));
+        var customer = Customer.Register(email, request.FullName, clock.GetUtcNow());
+        customer.SetPasswordHash(passwords.Hash(customer, request.Password));
         db.Customers.Add(customer);
         audit.Record("customer.registered", "customer", customer.Id, AuditOutcome.Succeeded, actorId: customer.Id);
 
@@ -87,10 +87,10 @@ internal static class AuthEndpoints
             return validation.ToProblem();
         }
 
-        var email = Customer.NormalizeEmail(request.Email!);
+        var email = Customer.NormalizeEmail(request.Email);
         var customer = await db.Customers.SingleOrDefaultAsync(c => c.Email == email, ct);
 
-        if (!passwords.Verify(customer, request.Password!, out var rehash) || customer is null)
+        if (!passwords.Verify(customer, request.Password, out var rehash) || customer is null)
         {
             // Recorded for spotting password guessing; the email is masked, the password never stored.
             audit.Record("auth.login_failed", "customer", customer?.Id, AuditOutcome.Rejected,

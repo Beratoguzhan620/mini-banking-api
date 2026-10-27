@@ -30,6 +30,8 @@ services:
       Database__MigrateOnStartup: "true"
       Jwt__SigningKey: ${JWT_SIGNING_KEY:-}
       Jwt__AllowEphemeralKey: "true"
+      # Empty keeps the /api/ops endpoints switched off.
+      Operations__ApiKey: ${OPERATIONS_API_KEY:-}
       TZ: Europe/Istanbul
     ports:
       - "8080:8080"
