@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using MiniBanking.Domain.Accounts;
+using MiniBanking.Domain.Audit;
 using MiniBanking.Domain.Customers;
 using MiniBanking.Domain.Transactions;
 
@@ -16,6 +17,8 @@ public sealed class BankingDbContext(DbContextOptions<BankingDbContext> options)
     public DbSet<LedgerEntry> LedgerEntries => Set<LedgerEntry>();
 
     public DbSet<IdempotencyRecord> IdempotencyRecords => Set<IdempotencyRecord>();
+
+    public DbSet<AuditEntry> AuditEntries => Set<AuditEntry>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
