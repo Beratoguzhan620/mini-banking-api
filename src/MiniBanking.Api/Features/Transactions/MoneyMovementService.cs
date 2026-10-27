@@ -1,7 +1,9 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Storage;
+using MiniBanking.Api.Features.Audit;
 using MiniBanking.Domain;
 using MiniBanking.Domain.Accounts;
+using MiniBanking.Domain.Audit;
 using MiniBanking.Domain.Transactions;
 using MiniBanking.Infrastructure.Persistence;
 
@@ -12,7 +14,7 @@ namespace MiniBanking.Api.Features.Transactions;
 /// check the rules, write the transaction and its two ledger entries, update cached balances, commit.
 /// If a rule fails, nothing is kept except a <see cref="TransactionStatus.Failed"/> record written afterwards.
 /// </summary>
-internal sealed class MoneyMovementService(BankingDbContext db, TimeProvider clock, ILogger<MoneyMovementService> logger)
+internal sealed class MoneyMovementService(BankingDbContext db, AuditTrail audit, TimeProvider clock, ILogger<MoneyMovementService> logger)
 {
     private const string PostingSavepoint = "posting";
 
@@ -104,12 +106,16 @@ internal sealed class MoneyMovementService(BankingDbContext db, TimeProvider clo
             var entries = Ledger.Move(transaction, posting.From, posting.To);
             db.BankTransactions.Add(transaction);
             db.LedgerEntries.AddRange(entries);
+            audit.Record($"{ActionPrefix(transaction)}.completed", "transaction", transaction.Id, AuditOutcome.Succeeded,
+                new { amountMinor = transaction.AmountMinor, transaction.Currency, transaction.SourceAccountId, transaction.DestinationAccountId });
             await db.SaveChangesAsync(ct);
             if (commit)
             {
                 await dbTransaction.CommitAsync(ct);
             }
 
+            logger.LogInformation("{TransactionType} {TransactionId} completed: {AmountMinor} {Currency}",
+                transaction.Type, transaction.Id, transaction.AmountMinor, transaction.Currency);
             return transaction;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -127,6 +133,9 @@ internal sealed class MoneyMovementService(BankingDbContext db, TimeProvider clo
             ?? new DomainException(ErrorCodes.ProcessingError, "The operation could not be completed and nothing was changed.");
         transaction.Fail(reason.Code, reason.Message);
         db.BankTransactions.Add(transaction);
+        audit.Record($"{ActionPrefix(transaction)}.failed", "transaction", transaction.Id,
+            failure is DomainException ? AuditOutcome.Rejected : AuditOutcome.Failed,
+            new { code = reason.Code, amountMinor = transaction.AmountMinor, transaction.Currency, transaction.SourceAccountId, transaction.DestinationAccountId });
         await db.SaveChangesAsync(ct);
         if (commit)
         {
@@ -140,6 +149,13 @@ internal sealed class MoneyMovementService(BankingDbContext db, TimeProvider clo
 
         throw new TransactionFailedException(transaction.Id, reason);
     }
+
+    private static string ActionPrefix(BankTransaction transaction) => transaction.Type switch
+    {
+        TransactionType.Deposit => "deposit",
+        TransactionType.Withdrawal => "withdrawal",
+        _ => "transfer",
+    };
 
     /// <summary>
     /// Locks the row for the rest of the database transaction. <c>xmin</c> is a system column, so it is
