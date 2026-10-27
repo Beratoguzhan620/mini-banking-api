@@ -27,8 +27,11 @@ open_account() {
   curl -sf -X POST "$API/accounts" -H "$JSON" -H "Authorization: Bearer $1" -d "{\"currency\":\"$2\"}"
 }
 
+money() { awk -v n="$1" 'BEGIN { printf "%.2f", n }'; }
+
 balance() {
-  curl -sf "$API/accounts/$2" -H "Authorization: Bearer $1" | jq -r '"\(.balance) \(.currency)"'
+  local account; account=$(curl -sf "$API/accounts/$2" -H "Authorization: Bearer $1")
+  printf '%s %s' "$(money "$(jq -r .balance <<< "$account")")" "$(jq -r .currency <<< "$account")"
 }
 
 transfer() { # token key source destination amount → "<status> <body>"
@@ -78,7 +81,8 @@ say "TRY → EUR: HTTP ${result%% *} $(jq -r .code <<< "${result#* }")"
 
 step "7. Mehmet's statement, newest first"
 curl -sf "$API/accounts/$m_id/transactions?limit=4" -H "Authorization: Bearer $mehmet" \
-  | jq -r '.items[] | "  \(.type | .[0:10] | . + " " * (10 - length)) \(if .amount > 0 then "+" else "" end)\(.amount)  → \(.balanceAfter)"'
+  | jq -r '.items[] | "\(.type) \(.amount) \(.balanceAfter)"' \
+  | while read -r type amount after; do printf '  %-10s %+10.2f   balance %10.2f\n' "$type" "$amount" "$after"; done
 
 if [ -n "${OPS_KEY:-}" ]; then
   step "8. Reconciliation: every cached balance against the ledger"
