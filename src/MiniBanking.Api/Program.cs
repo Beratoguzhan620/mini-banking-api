@@ -43,6 +43,8 @@ builder.Services.ConfigureHttpJsonOptions(options =>
     // Keep Turkish characters readable in responses instead of \u escapes.
     options.SerializerOptions.Encoder = JavaScriptEncoder.Create(UnicodeRanges.All);
     options.SerializerOptions.Converters.Add(new JsonStringEnumConverter());
+    // Amounts are JSON numbers; "10" as a string is refused rather than guessed.
+    options.SerializerOptions.NumberHandling = JsonNumberHandling.Strict;
 });
 
 builder.Services.AddBankingAuth(builder.Configuration);
@@ -56,6 +58,7 @@ builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = 
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 
 builder.Services.AddOpenApi(options => options
+    .AddDocumentTransformer<DocumentInfoTransformer>()
     .AddDocumentTransformer<BearerSecuritySchemeTransformer>()
     .AddOperationTransformer<IdempotencyHeaderTransformer>());
 builder.Services.AddHealthChecks()
@@ -81,7 +84,12 @@ app.MapScalarApiReference(options => options
     .ForceLightMode()
     .HideDarkModeToggle()
     .DisableDefaultFonts()
-    .WithCustomCss(ScalarStyle.Css));
+    .WithCustomCss(ScalarStyle.Css)
+    .HideDeveloperTools()
+    .HideClientButton()
+    .DisableAgent()
+    .DisableMcp()
+    .DisableTelemetry());
 app.MapGet("/", () => Results.Redirect("/scalar")).ExcludeFromDescription();
 
 app.MapAuthEndpoints();

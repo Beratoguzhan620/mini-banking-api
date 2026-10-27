@@ -14,7 +14,9 @@ using MiniBanking.Infrastructure.Persistence;
 
 namespace MiniBanking.Api.Features.Transactions;
 
-internal sealed record MoneyRequest(decimal? Amount, string? Description);
+/// <param name="Amount">Positive, at most two decimals, in the account's currency.</param>
+/// <param name="Description">Optional note shown in the history.</param>
+internal sealed record MoneyRequest(decimal Amount, string? Description = null);
 
 internal sealed record TransactionResponse(
     Guid Id,
@@ -48,8 +50,8 @@ internal static class TransactionEndpoints
     public static IEndpointRouteBuilder MapTransactionEndpoints(this IEndpointRouteBuilder app)
     {
         var accounts = app.MapGroup("/api/accounts/{id:guid}").WithTags("Transactions").RequireAuthorization();
-        accounts.MapPost("/deposits", Deposit).WithSummary("Deposit money (simulated)").RequireIdempotencyKey();
-        accounts.MapPost("/withdrawals", Withdraw).WithSummary("Withdraw money (simulated)").RequireIdempotencyKey();
+        accounts.MapPost("/deposits", Deposit).WithSummary("Deposit money (simulated)").RequireIdempotencyKey().ProducesMoneyProblems();
+        accounts.MapPost("/withdrawals", Withdraw).WithSummary("Withdraw money (simulated)").RequireIdempotencyKey().ProducesMoneyProblems();
         accounts.MapGet("/transactions", History).WithSummary("Account history, newest first, keyset paginated");
 
         app.MapGet("/api/transactions/{id:guid}", Get)
@@ -73,7 +75,7 @@ internal static class TransactionEndpoints
         long amountMinor = 0;
         validation ??= new Validation();
         validation
-            .Require(request.Amount is { } amount && Amounts.TryToMinor(amount, out amountMinor), "amount",
+            .Require(Amounts.TryToMinor(request.Amount, out amountMinor), "amount",
                 $"Amount must be positive, have at most two decimals and be no more than {Amounts.MaxPerOperation:N0}.")
             .Require(request.Description is null || request.Description.Length <= BankTransaction.DescriptionMaxLength,
                 "description", $"Description can be at most {BankTransaction.DescriptionMaxLength} characters.");

@@ -10,7 +10,8 @@ using MiniBanking.Infrastructure.Persistence;
 
 namespace MiniBanking.Api.Features.Accounts;
 
-internal sealed record OpenAccountRequest(string? Currency);
+/// <param name="Currency">TRY, USD or EUR.</param>
+internal sealed record OpenAccountRequest(string Currency);
 
 internal sealed record AccountResponse(
     Guid Id,
@@ -69,7 +70,7 @@ internal static class AccountEndpoints
             return validation.ToProblem();
         }
 
-        var account = Account.Open(user.CustomerId(), request.Currency!, clock.GetUtcNow());
+        var account = Account.Open(user.CustomerId(), request.Currency, clock.GetUtcNow());
         db.Accounts.Add(account);
         audit.Record("account.opened", "account", account.Id, AuditOutcome.Succeeded, new { account.Currency });
         await db.SaveChangesAsync(ct);
