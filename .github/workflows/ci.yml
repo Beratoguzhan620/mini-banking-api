@@ -60,12 +60,12 @@ jobs:
           token=$(curl -sf -X POST $api/auth/login -H "$json" -d '{"email":"smoke@example.com","password":"smoke-test-password"}' | jq -r .accessToken)
           auth="Authorization: Bearer $token"
           account=$(curl -sf -X POST $api/accounts -H "$json" -H "$auth" -d '{"currency":"TRY"}' | jq -r .id)
-          curl -sf -X POST $api/accounts/$account/deposits -H "$json" -H "$auth" -d '{"amount":250.50}' > /dev/null
+          curl -sf -X POST $api/accounts/$account/deposits -H "$json" -H "$auth" -H "Idempotency-Key: $(uuidgen)" -d '{"amount":250.50}' > /dev/null
           balance=$(curl -sf $api/accounts/$account -H "$auth" | jq -r .balance)
           test "$balance" = "250.5"
 
           second=$(curl -sf -X POST $api/accounts -H "$json" -H "$auth" -d '{"currency":"TRY"}' | jq -r .number)
-          curl -sf -X POST $api/transfers -H "$json" -H "$auth" -d "{\"sourceAccountId\":\"$account\",\"destinationAccountNumber\":\"$second\",\"amount\":50}" > /dev/null
+          curl -sf -X POST $api/transfers -H "$json" -H "$auth" -H "Idempotency-Key: $(uuidgen)" -d "{\"sourceAccountId\":\"$account\",\"destinationAccountNumber\":\"$second\",\"amount\":50}" > /dev/null
           balance=$(curl -sf $api/accounts/$account -H "$auth" | jq -r .balance)
           test "$balance" = "200.5"
           echo "Mini Banking API is up and moves money."
