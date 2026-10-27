@@ -48,7 +48,7 @@ internal sealed class SecuritySchemesTransformer : IOpenApiDocumentTransformer, 
             operation.Security ??= [];
             operation.Security.Add(new OpenApiSecurityRequirement
             {
-                [new OpenApiSecuritySchemeReference(scheme)] = [],
+                [new OpenApiSecuritySchemeReference(scheme, context.Document)] = [],
             });
         }
 
