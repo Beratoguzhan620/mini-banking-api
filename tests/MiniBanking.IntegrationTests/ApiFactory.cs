@@ -14,6 +14,8 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
 
     private static readonly string SigningKey = Convert.ToBase64String(System.Security.Cryptography.RandomNumberGenerator.GetBytes(48));
 
+    public const string OperationsKey = "test-operations-key";
+
     public string ConnectionString => _database.GetConnectionString();
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
@@ -22,6 +24,7 @@ public sealed class ApiFactory : WebApplicationFactory<Program>, IAsyncLifetime
         builder.UseSetting("ConnectionStrings:Banking", ConnectionString);
         builder.UseSetting("Database:MigrateOnStartup", "true");
         builder.UseSetting("Jwt:SigningKey", SigningKey);
+        builder.UseSetting("Operations:ApiKey", OperationsKey);
     }
 
     public async Task InitializeAsync()

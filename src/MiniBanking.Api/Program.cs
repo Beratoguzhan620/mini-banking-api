@@ -5,16 +5,23 @@ using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.EntityFrameworkCore;
 using MiniBanking.Api.Common;
 using MiniBanking.Api.Features.Accounts;
+using MiniBanking.Api.Features.Audit;
 using MiniBanking.Api.Features.Auth;
 using MiniBanking.Api.Features.Idempotency;
+using MiniBanking.Api.Features.Operations;
 using MiniBanking.Api.Features.Transactions;
 using MiniBanking.Api.Features.Transfers;
+using MiniBanking.Api.Logging;
 using MiniBanking.Infrastructure;
 using MiniBanking.Infrastructure.Persistence;
 using Scalar.AspNetCore;
 using Serilog;
+using Serilog.Core;
 
 var builder = WebApplication.CreateBuilder(args);
+
+// Picked up by ReadFrom.Services below, so every log event is masked before any sink sees it.
+builder.Services.AddSingleton<ILogEventEnricher, SensitiveDataEnricher>();
 
 builder.Services.AddSerilog((services, logger) => logger
     .ReadFrom.Configuration(builder.Configuration)
@@ -40,6 +47,9 @@ builder.Services.ConfigureHttpJsonOptions(options =>
 
 builder.Services.AddBankingAuth(builder.Configuration);
 builder.Services.AddScoped<MoneyMovementService>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<AuditTrail>();
+builder.Services.Configure<OperationsOptions>(builder.Configuration.GetSection(OperationsOptions.Section));
 
 builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = context =>
     context.ProblemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier);
@@ -53,6 +63,8 @@ builder.Services.AddHealthChecks()
 
 var app = builder.Build();
 
+// First, so the id is on every log line, response and audit entry of the request.
+app.UseMiddleware<CorrelationIdMiddleware>();
 // Request logging sits outside the exception handler so it records the final status code.
 app.UseSerilogRequestLogging();
 app.UseAuthentication();
@@ -70,6 +82,7 @@ app.MapAuthEndpoints();
 app.MapAccountEndpoints();
 app.MapTransactionEndpoints();
 app.MapTransferEndpoints();
+app.MapOperationsEndpoints();
 
 app.MapHealthChecks("/health/live", new HealthCheckOptions { Predicate = _ => false });
 app.MapHealthChecks("/health/ready", new HealthCheckOptions { Predicate = check => check.Tags.Contains("ready") });

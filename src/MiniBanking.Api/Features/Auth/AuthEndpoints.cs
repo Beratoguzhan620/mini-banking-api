@@ -3,7 +3,10 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using MiniBanking.Api.Common;
+using MiniBanking.Api.Features.Audit;
+using MiniBanking.Api.Logging;
 using MiniBanking.Domain;
+using MiniBanking.Domain.Audit;
 using MiniBanking.Domain.Customers;
 using MiniBanking.Infrastructure.Persistence;
 
@@ -35,7 +38,7 @@ internal static class AuthEndpoints
     }
 
     private static async Task<Results<Created<CustomerResponse>, ValidationProblem>> Register(
-        RegisterRequest request, BankingDbContext db, PasswordVerifier passwords, TimeProvider clock, CancellationToken ct)
+        RegisterRequest request, BankingDbContext db, PasswordVerifier passwords, AuditTrail audit, TimeProvider clock, CancellationToken ct)
     {
         var validation = new Validation()
             .Require(IsEmail(request.Email), "email", "A valid email address is required.")
@@ -57,6 +60,7 @@ internal static class AuthEndpoints
         var customer = Customer.Register(email, request.FullName!, clock.GetUtcNow());
         customer.SetPasswordHash(passwords.Hash(customer, request.Password!));
         db.Customers.Add(customer);
+        audit.Record("customer.registered", "customer", customer.Id, AuditOutcome.Succeeded, actorId: customer.Id);
 
         try
         {
@@ -72,7 +76,8 @@ internal static class AuthEndpoints
     }
 
     private static async Task<Results<Ok<AccessTokenResponse>, ValidationProblem>> Login(
-        LoginRequest request, BankingDbContext db, PasswordVerifier passwords, TokenService tokens, CancellationToken ct)
+        LoginRequest request, BankingDbContext db, PasswordVerifier passwords, TokenService tokens, AuditTrail audit,
+        ILoggerFactory loggers, CancellationToken ct)
     {
         var validation = new Validation()
             .Require(!string.IsNullOrWhiteSpace(request.Email), "email", "Email is required.")
@@ -87,6 +92,12 @@ internal static class AuthEndpoints
 
         if (!passwords.Verify(customer, request.Password!, out var rehash) || customer is null)
         {
+            // Recorded for spotting password guessing; the email is masked, the password never stored.
+            audit.Record("auth.login_failed", "customer", customer?.Id, AuditOutcome.Rejected,
+                new { email = Masking.Email(email), knownEmail = customer is not null }, actorId: customer?.Id);
+            await db.SaveChangesAsync(ct);
+            loggers.CreateLogger("MiniBanking.Auth").LogWarning("Failed login for {Email}", email);
+
             // Same answer for an unknown email and a wrong password.
             throw new DomainException(ErrorCodes.InvalidCredentials, "Email or password is incorrect.");
         }
@@ -94,8 +105,10 @@ internal static class AuthEndpoints
         if (rehash is not null)
         {
             customer.SetPasswordHash(rehash);
-            await db.SaveChangesAsync(ct);
         }
+
+        audit.Record("auth.login_succeeded", "customer", customer.Id, AuditOutcome.Succeeded, actorId: customer.Id);
+        await db.SaveChangesAsync(ct);
 
         return TypedResults.Ok(tokens.Issue(customer));
     }

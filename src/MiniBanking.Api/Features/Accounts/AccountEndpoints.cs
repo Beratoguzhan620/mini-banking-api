@@ -2,8 +2,10 @@ using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.EntityFrameworkCore;
 using MiniBanking.Api.Common;
+using MiniBanking.Api.Features.Audit;
 using MiniBanking.Domain;
 using MiniBanking.Domain.Accounts;
+using MiniBanking.Domain.Audit;
 using MiniBanking.Infrastructure.Persistence;
 
 namespace MiniBanking.Api.Features.Accounts;
@@ -57,7 +59,7 @@ internal static class AccountEndpoints
     }
 
     private static async Task<Results<Created<AccountResponse>, ValidationProblem>> Open(
-        OpenAccountRequest request, ClaimsPrincipal user, BankingDbContext db, TimeProvider clock, CancellationToken ct)
+        OpenAccountRequest request, ClaimsPrincipal user, BankingDbContext db, AuditTrail audit, TimeProvider clock, CancellationToken ct)
     {
         var validation = new Validation()
             .Require(!string.IsNullOrWhiteSpace(request.Currency), "currency",
@@ -69,6 +71,7 @@ internal static class AccountEndpoints
 
         var account = Account.Open(user.CustomerId(), request.Currency!, clock.GetUtcNow());
         db.Accounts.Add(account);
+        audit.Record("account.opened", "account", account.Id, AuditOutcome.Succeeded, new { account.Currency });
         await db.SaveChangesAsync(ct);
 
         return TypedResults.Created($"/api/accounts/{account.Id}", AccountResponse.From(account));
@@ -77,20 +80,22 @@ internal static class AccountEndpoints
     private static async Task<Ok<AccountResponse>> Get(Guid id, ClaimsPrincipal user, BankingDbContext db, CancellationToken ct) =>
         TypedResults.Ok(AccountResponse.From(await db.FindOwnedAccountAsync(id, user.CustomerId(), ct)));
 
-    private static Task<Ok<AccountResponse>> Freeze(Guid id, ClaimsPrincipal user, BankingDbContext db, CancellationToken ct) =>
-        Change(id, user, db, account => account.Freeze(), ct);
+    private static Task<Ok<AccountResponse>> Freeze(Guid id, ClaimsPrincipal user, BankingDbContext db, AuditTrail audit, CancellationToken ct) =>
+        Change(id, user, db, audit, "account.frozen", account => account.Freeze(), ct);
 
-    private static Task<Ok<AccountResponse>> Unfreeze(Guid id, ClaimsPrincipal user, BankingDbContext db, CancellationToken ct) =>
-        Change(id, user, db, account => account.Unfreeze(), ct);
+    private static Task<Ok<AccountResponse>> Unfreeze(Guid id, ClaimsPrincipal user, BankingDbContext db, AuditTrail audit, CancellationToken ct) =>
+        Change(id, user, db, audit, "account.unfrozen", account => account.Unfreeze(), ct);
 
-    private static Task<Ok<AccountResponse>> Close(Guid id, ClaimsPrincipal user, BankingDbContext db, TimeProvider clock, CancellationToken ct) =>
-        Change(id, user, db, account => account.Close(clock.GetUtcNow()), ct);
+    private static Task<Ok<AccountResponse>> Close(
+        Guid id, ClaimsPrincipal user, BankingDbContext db, AuditTrail audit, TimeProvider clock, CancellationToken ct) =>
+        Change(id, user, db, audit, "account.closed", account => account.Close(clock.GetUtcNow()), ct);
 
     private static async Task<Ok<AccountResponse>> Change(
-        Guid id, ClaimsPrincipal user, BankingDbContext db, Action<Account> change, CancellationToken ct)
+        Guid id, ClaimsPrincipal user, BankingDbContext db, AuditTrail audit, string action, Action<Account> change, CancellationToken ct)
     {
         var account = await db.FindOwnedAccountAsync(id, user.CustomerId(), ct);
         change(account);
+        audit.Record(action, "account", account.Id, AuditOutcome.Succeeded);
         // xmin makes this fail with 409 if a transfer touched the account in between.
         await db.SaveChangesAsync(ct);
         return TypedResults.Ok(AccountResponse.From(account));
