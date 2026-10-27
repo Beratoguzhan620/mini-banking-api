@@ -18,4 +18,7 @@ public static class ErrorCodes
     public const string SameAccount = "same_account";
     public const string ProcessingError = "processing_error";
     public const string DestinationNotFound = "destination_not_found";
+    public const string IdempotencyKeyMissing = "idempotency_key_missing";
+    public const string IdempotencyKeyInvalid = "idempotency_key_invalid";
+    public const string IdempotencyKeyReused = "idempotency_key_reused";
 }

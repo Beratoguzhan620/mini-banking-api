@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.WebUtilities;
 using Microsoft.EntityFrameworkCore;
 using MiniBanking.Api.Common;
+using MiniBanking.Api.Features.Idempotency;
 using MiniBanking.Api.Features.Accounts;
 using MiniBanking.Domain;
 using MiniBanking.Domain.Accounts;
@@ -47,8 +48,8 @@ internal static class TransactionEndpoints
     public static IEndpointRouteBuilder MapTransactionEndpoints(this IEndpointRouteBuilder app)
     {
         var accounts = app.MapGroup("/api/accounts/{id:guid}").WithTags("Transactions").RequireAuthorization();
-        accounts.MapPost("/deposits", Deposit).WithSummary("Deposit money (simulated)");
-        accounts.MapPost("/withdrawals", Withdraw).WithSummary("Withdraw money (simulated)");
+        accounts.MapPost("/deposits", Deposit).WithSummary("Deposit money (simulated)").RequireIdempotencyKey();
+        accounts.MapPost("/withdrawals", Withdraw).WithSummary("Withdraw money (simulated)").RequireIdempotencyKey();
         accounts.MapGet("/transactions", History).WithSummary("Account history, newest first, keyset paginated");
 
         app.MapGet("/api/transactions/{id:guid}", Get)

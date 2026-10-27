@@ -6,6 +6,7 @@ using Microsoft.EntityFrameworkCore;
 using MiniBanking.Api.Common;
 using MiniBanking.Api.Features.Accounts;
 using MiniBanking.Api.Features.Auth;
+using MiniBanking.Api.Features.Idempotency;
 using MiniBanking.Api.Features.Transactions;
 using MiniBanking.Api.Features.Transfers;
 using MiniBanking.Infrastructure;
@@ -44,7 +45,9 @@ builder.Services.AddProblemDetails(options => options.CustomizeProblemDetails = 
     context.ProblemDetails.Extensions["traceId"] = context.HttpContext.TraceIdentifier);
 builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 
-builder.Services.AddOpenApi(options => options.AddDocumentTransformer<BearerSecuritySchemeTransformer>());
+builder.Services.AddOpenApi(options => options
+    .AddDocumentTransformer<BearerSecuritySchemeTransformer>()
+    .AddOperationTransformer<IdempotencyHeaderTransformer>());
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<BankingDbContext>("database", tags: ["ready"]);
 
@@ -52,9 +55,11 @@ var app = builder.Build();
 
 // Request logging sits outside the exception handler so it records the final status code.
 app.UseSerilogRequestLogging();
+app.UseAuthentication();
+// Outside the exception handler, so error responses are stored and replayed too.
+app.UseMiddleware<IdempotencyMiddleware>();
 app.UseExceptionHandler();
 app.UseStatusCodePages();
-app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapOpenApi();

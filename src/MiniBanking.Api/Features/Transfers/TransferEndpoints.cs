@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using Microsoft.AspNetCore.Http.HttpResults;
 using MiniBanking.Api.Common;
+using MiniBanking.Api.Features.Idempotency;
 using MiniBanking.Api.Features.Transactions;
 using MiniBanking.Domain.Accounts;
 using MiniBanking.Infrastructure.Persistence;
@@ -16,7 +17,8 @@ internal static class TransferEndpoints
         app.MapPost("/api/transfers", Transfer)
             .WithTags("Transfers")
             .WithSummary("Send money from one of your accounts to any account in the same currency")
-            .RequireAuthorization();
+            .RequireAuthorization()
+            .RequireIdempotencyKey();
 
         return app;
     }
