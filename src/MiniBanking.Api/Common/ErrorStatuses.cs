@@ -8,6 +8,8 @@ internal static class ErrorStatuses
     private static readonly Dictionary<string, int> Statuses = new(StringComparer.Ordinal)
     {
         [ErrorCodes.ValidationFailed] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.IdempotencyKeyMissing] = StatusCodes.Status400BadRequest,
+        [ErrorCodes.IdempotencyKeyInvalid] = StatusCodes.Status400BadRequest,
         [ErrorCodes.InvalidCredentials] = StatusCodes.Status401Unauthorized,
         [ErrorCodes.NotFound] = StatusCodes.Status404NotFound,
         [ErrorCodes.EmailTaken] = StatusCodes.Status409Conflict,

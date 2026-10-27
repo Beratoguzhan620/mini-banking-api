@@ -59,14 +59,24 @@ public static class ApiClient
         return (await response.Content.ReadFromJsonAsync<AccountDto>(Json))!;
     }
 
-    public static Task<HttpResponseMessage> DepositAsync(this HttpClient client, Guid accountId, decimal amount, string? description = null) =>
-        client.PostAsJsonAsync($"/api/accounts/{accountId}/deposits", new { amount, description });
+    public const string IdempotencyHeader = "Idempotency-Key";
 
-    public static Task<HttpResponseMessage> WithdrawAsync(this HttpClient client, Guid accountId, decimal amount) =>
-        client.PostAsJsonAsync($"/api/accounts/{accountId}/withdrawals", new { amount });
+    /// <summary>Money-moving POST with an idempotency key; a fresh key per call unless one is given.</summary>
+    public static Task<HttpResponseMessage> PostMoneyAsync(this HttpClient client, string url, object body, string? idempotencyKey = null)
+    {
+        var request = new HttpRequestMessage(HttpMethod.Post, url) { Content = JsonContent.Create(body) };
+        request.Headers.Add(IdempotencyHeader, idempotencyKey ?? Guid.NewGuid().ToString());
+        return client.SendAsync(request);
+    }
 
-    public static Task<HttpResponseMessage> TransferAsync(this HttpClient client, Guid sourceAccountId, string destinationAccountNumber, decimal amount, string? description = null) =>
-        client.PostAsJsonAsync("/api/transfers", new { sourceAccountId, destinationAccountNumber, amount, description });
+    public static Task<HttpResponseMessage> DepositAsync(this HttpClient client, Guid accountId, decimal amount, string? description = null, string? idempotencyKey = null) =>
+        client.PostMoneyAsync($"/api/accounts/{accountId}/deposits", new { amount, description }, idempotencyKey);
+
+    public static Task<HttpResponseMessage> WithdrawAsync(this HttpClient client, Guid accountId, decimal amount, string? idempotencyKey = null) =>
+        client.PostMoneyAsync($"/api/accounts/{accountId}/withdrawals", new { amount }, idempotencyKey);
+
+    public static Task<HttpResponseMessage> TransferAsync(this HttpClient client, Guid sourceAccountId, string destinationAccountNumber, decimal amount, string? description = null, string? idempotencyKey = null) =>
+        client.PostMoneyAsync("/api/transfers", new { sourceAccountId, destinationAccountNumber, amount, description }, idempotencyKey);
 
     public static async Task<AccountDto> GetAccountAsync(this HttpClient client, Guid accountId) =>
         await (await client.GetAsync($"/api/accounts/{accountId}")).ReadAsync<AccountDto>();

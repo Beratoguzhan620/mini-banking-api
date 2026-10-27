@@ -1,4 +1,5 @@
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.Storage;
 using MiniBanking.Domain;
 using MiniBanking.Domain.Accounts;
 using MiniBanking.Domain.Transactions;
@@ -70,8 +71,28 @@ internal sealed class MoneyMovementService(BankingDbContext db, TimeProvider clo
 
     private async Task<BankTransaction> PostAsync(Func<Task<Posting>> prepare, CancellationToken ct)
     {
-        await using var dbTransaction = await db.Database.BeginTransactionAsync(ct);
+        // When the request carries an idempotency key, the middleware has already opened a transaction that
+        // also holds the key row. It then owns the commit, so the key and the money move together or not at all.
+        var ambient = db.Database.CurrentTransaction;
+        var owned = ambient is null ? await db.Database.BeginTransactionAsync(ct) : null;
+        var dbTransaction = ambient ?? owned!;
 
+        try
+        {
+            return await PostInTransactionAsync(dbTransaction, commit: owned is not null, prepare, ct);
+        }
+        finally
+        {
+            if (owned is not null)
+            {
+                await owned.DisposeAsync();
+            }
+        }
+    }
+
+    private async Task<BankTransaction> PostInTransactionAsync(
+        IDbContextTransaction dbTransaction, bool commit, Func<Task<Posting>> prepare, CancellationToken ct)
+    {
         // Lookups, locks and ownership checks happen here; a missing account is a plain 404, not a failed transaction.
         var posting = await prepare();
         var transaction = posting.Transaction;
@@ -84,7 +105,11 @@ internal sealed class MoneyMovementService(BankingDbContext db, TimeProvider clo
             db.BankTransactions.Add(transaction);
             db.LedgerEntries.AddRange(entries);
             await db.SaveChangesAsync(ct);
-            await dbTransaction.CommitAsync(ct);
+            if (commit)
+            {
+                await dbTransaction.CommitAsync(ct);
+            }
+
             return transaction;
         }
         catch (Exception ex) when (ex is not OperationCanceledException)
@@ -103,7 +128,10 @@ internal sealed class MoneyMovementService(BankingDbContext db, TimeProvider clo
         transaction.Fail(reason.Code, reason.Message);
         db.BankTransactions.Add(transaction);
         await db.SaveChangesAsync(ct);
-        await dbTransaction.CommitAsync(ct);
+        if (commit)
+        {
+            await dbTransaction.CommitAsync(ct);
+        }
 
         if (failure is not DomainException)
         {
