@@ -4,6 +4,9 @@ using Microsoft.Extensions.Options;
 
 namespace MiniBanking.Api.Features.Operations;
 
+/// <summary>Endpoint metadata marking back-office endpoints, used to document the key they need.</summary>
+internal sealed class RequiresOperationsKey;
+
 internal sealed class OperationsKeyFilter(IOptions<OperationsOptions> options) : IEndpointFilter
 {
     public const string HeaderName = "X-Operations-Key";

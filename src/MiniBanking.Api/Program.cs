@@ -59,7 +59,8 @@ builder.Services.AddExceptionHandler<DomainExceptionHandler>();
 
 builder.Services.AddOpenApi(options => options
     .AddDocumentTransformer<DocumentInfoTransformer>()
-    .AddDocumentTransformer<BearerSecuritySchemeTransformer>()
+    .AddDocumentTransformer<SecuritySchemesTransformer>()
+    .AddOperationTransformer<SecuritySchemesTransformer>()
     .AddOperationTransformer<IdempotencyHeaderTransformer>());
 builder.Services.AddHealthChecks()
     .AddDbContextCheck<BankingDbContext>("database", tags: ["ready"]);

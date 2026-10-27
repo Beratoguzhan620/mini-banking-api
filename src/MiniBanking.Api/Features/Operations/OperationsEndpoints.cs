@@ -38,7 +38,12 @@ internal static class OperationsEndpoints
 
     public static IEndpointRouteBuilder MapOperationsEndpoints(this IEndpointRouteBuilder app)
     {
-        var group = app.MapGroup("/api/ops").WithTags("Operations").AddEndpointFilter<OperationsKeyFilter>();
+        var group = app.MapGroup("/api/ops")
+            .WithTags("Operations")
+            .WithMetadata(new RequiresOperationsKey())
+            .AddEndpointFilter<OperationsKeyFilter>()
+            .ProducesProblem(StatusCodes.Status401Unauthorized)
+            .ProducesProblem(StatusCodes.Status404NotFound);
         group.MapGet("/reconciliation", Reconcile).WithSummary("Compare every cached balance with the ledger");
         group.MapGet("/audit", Audit).WithSummary("Search the audit trail, newest first");
         return app;
