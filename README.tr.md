@@ -153,6 +153,7 @@ dotnet user-secrets --project src/MiniBanking.Api set "Operations:ApiKey" "<iste
 - İşlem olaylarının outbox üzerinden [notification-service](https://github.com/Beratoguzhan620/notification-service)'e gönderilmesi.
 - Sonuçları yayımlanmış bir k6 yük testi.
 - Refresh token'lar; şu an access token bir saat sonra süresi dolarak geçersiz olur.
+- Operasyon uç noktaları tek bir paylaşılan anahtar kullanıyor; bu yüzden denetim kaydı bunları hangi operatörün çağırdığını ayırt edemiyor. Gerçek bir kurulumda operatörlerin yönetici rolüyle kendi hesapları olur ([background-jobs](https://github.com/Beratoguzhan620/background-jobs) projesindeki gibi) ve bu uç noktalar iç ağda kalır.
 
 ## Lisans
 
