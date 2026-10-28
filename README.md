@@ -153,6 +153,7 @@ dotnet user-secrets --project src/MiniBanking.Api set "Operations:ApiKey" "<opti
 - Sending transaction events to the [notification-service](https://github.com/Beratoguzhan620/notification-service) through an outbox.
 - A k6 load test with published numbers.
 - Refresh tokens; today an access token simply expires after an hour.
+- The operations endpoints use one shared key, so the audit trail cannot tell which operator called them. A real deployment would give operators their own accounts with an admin role (as [background-jobs](https://github.com/Beratoguzhan620/background-jobs) does) and keep these endpoints on the internal network.
 
 ## License
 
