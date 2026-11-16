@@ -13,6 +13,8 @@ Tek bir söz üzerine kurulu bir bankacılık API'si: para yoktan var olmaz, kay
 
 ## Deneme
 
+**Canlı demo:** [mini-banking-api-7pdz.onrender.com/scalar](https://mini-banking-api-7pdz.onrender.com/scalar). Kayıt ol, giriş yap, aldığın token ile *Authorize*'a bas; sonra hesap aç ve para gönder. Ücretsiz bir sunucuda, veritabanı Neon'da çalışıyor: bir süre kimse açmadıysa ilk açılış bir dakika kadar sürebilir.
+
 ```bash
 docker compose up --build
 ```

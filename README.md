@@ -13,6 +13,8 @@ A banking API built around one promise: money never appears, disappears or moves
 
 ## Try it
 
+**Live demo:** [mini-banking-api-7pdz.onrender.com/scalar](https://mini-banking-api-7pdz.onrender.com/scalar). Register, sign in, press *Authorize* with the token, then open an account and move money. It runs on a free server with the database on Neon: after a quiet spell the first visit can take about a minute.
+
 ```bash
 docker compose up --build
 ```
